@@ -11,7 +11,7 @@ This repository contains a simple setup for Kafka messaging using Docker. It inc
 ## Setup and Usage
 
 ### Step 1: Clone the Repository
-```markdown
+
 ```bash
 git clone https://github.com/naveedqadir/containers.git
 cd containers
