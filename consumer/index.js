@@ -1,62 +1,74 @@
-const kafka = require('kafka-node');
-const { KafkaClient, Consumer, Admin } = kafka;
+const { Kafka } = require('kafkajs');
 
 const topic = 'test';
-const kafkaHost = 'kafka:9092';
-const client = new KafkaClient({ kafkaHost });
-const admin = new Admin(client);
+const brokers = ['kafka:9092'];
 
-const createConsumer = () => {
-  const consumer = new Consumer(
-    client,
-    [{ topic, partition: 0 }],
-    { autoCommit: true }
-  );
+// Create Kafka client
+const kafka = new Kafka({
+  clientId: 'consumer-app',
+  brokers: brokers
+});
 
-  consumer.on('message', (message) => {
-    console.log('Received message:', message);
-  });
+// Create consumer
+const consumer = kafka.consumer({ groupId: 'test-group' });
 
-  consumer.on('error', (err) => {
-    console.error('Consumer error:', err);
-    if (err.message.includes('TopicsNotExistError')) {
-      console.log('Retrying in 5 seconds...');
-      setTimeout(createConsumer, 5000);  // Retry after 5 seconds
-    }
-  });
-
-  return consumer;
+const run = async () => {
+  try {
+    // Connect to the broker
+    await consumer.connect();
+    
+    // Subscribe to the topic
+    await consumer.subscribe({ topic, fromBeginning: true });
+    
+    // Process messages
+    await consumer.run({
+      eachMessage: async ({ topic, partition, message }) => {
+        console.log('Received message:', {
+          topic,
+          partition,
+          offset: message.offset,
+          value: message.value.toString(),
+          headers: message.headers
+        });
+      },
+    });
+    
+    console.log(`Consumer started and subscribed to topic "${topic}"`);
+    
+  } catch (error) {
+    console.error('Error in consumer:', error);
+    // Attempt to reconnect after a delay
+    setTimeout(run, 5000);
+  }
 };
 
-const checkTopicExists = (callback) => {
-  admin.listTopics((err, res) => {
-    if (err) {
-      console.error('Error listing topics:', err);
-      callback(err);
-    } else {
-      const topics = Object.keys(res[1].metadata);
-      if (topics.includes(topic)) {
-        callback(null, true);
-      } else {
-        callback(null, false);
-      }
+// Handle graceful shutdown
+const errorTypes = ['unhandledRejection', 'uncaughtException'];
+const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
+
+errorTypes.forEach(type => {
+  process.on(type, async () => {
+    try {
+      console.log(`Process.on ${type}`);
+      await consumer.disconnect();
+      process.exit(0);
+    } catch (_) {
+      process.exit(1);
     }
   });
-};
+});
 
-const initializeConsumer = () => {
-  checkTopicExists((err, exists) => {
-    if (err) {
-      console.error('Error checking topic existence:', err);
-      setTimeout(initializeConsumer, 5000);  // Retry after 5 seconds
-    } else if (exists) {
-      console.log(`Topic "${topic}" exists. Creating consumer.`);
-      createConsumer();
-    } else {
-      console.log(`Topic "${topic}" does not exist. Retrying...`);
-      setTimeout(initializeConsumer, 5000);  // Retry after 5 seconds
+signalTraps.forEach(type => {
+  process.once(type, async () => {
+    try {
+      await consumer.disconnect();
+    } finally {
+      process.kill(process.pid, type);
     }
   });
-};
+});
 
-initializeConsumer();
+// Start the consumer
+run().catch(error => {
+  console.error('Failed to start consumer:', error);
+});

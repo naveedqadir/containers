@@ -2,7 +2,7 @@
 
 # Kafka Messaging with Docker
 
-This repository contains a simple setup for Kafka messaging using Docker. It includes one producer and one consumer container that communicate via Kafka.
+This repository contains a simple setup for Kafka messaging using Docker. It includes one producer and one consumer container that communicate via Kafka using the KafkaJS library.
 
 ## Prerequisites
 
@@ -25,17 +25,22 @@ Use the following command to build and start the containers:
 docker-compose up --build
 ```
 
-### Step 3: Verify the Setup
+### Step 3: Test the Setup
 
-After running the above command, you should see logs from both the producer and consumer in your terminal. The producer sends messages to Kafka, and the consumer receives them.
+Once the containers are running, you can send a message to Kafka by using the producer's API:
+
+```bash
+curl http://localhost:3000/send
+```
+
+After running this command, you should see the message being received in the consumer's logs.
 
 ## Configuration
 
 The setup includes the following services:
-- **Kafka Broker:** Handles message brokering.
-- **Zookeeper:** Coordinates and manages Kafka brokers.
-- **Producer:** Sends messages to the Kafka topic.
-- **Consumer:** Consumes messages from the Kafka topic.
+- **Kafka Broker:** Handles message brokering in KRaft mode (without Zookeeper).
+- **Producer:** Sends messages to the Kafka topic using KafkaJS.
+- **Consumer:** Consumes messages from the Kafka topic using KafkaJS.
 
 ## Stopping the Containers
 
